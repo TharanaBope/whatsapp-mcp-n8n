@@ -1,46 +1,16 @@
 # WhatsApp MCP Server
 
-A Model Context Protocol (MCP) server for WhatsApp integration. This server provides standardized API endpoints for various WhatsApp operations including sending messages, searching contacts, and managing chats.
+This is a Model Context Protocol (MCP) server for WhatsApp.
 
-## Project Structure
+With this you can search and read your personal Whatsapp messages (including images, videos, documents, and audio messages), search your contacts and send messages to either individuals or groups. You can also send media files including images, videos, documents, and audio messages.
 
-- **whatsapp-mcp-server**: Python-based MCP server
-- **whatsapp-bridge**: Go-based bridge to WhatsApp API (running separately)
+It connects to your **personal WhatsApp account** directly via the Whatsapp web multidevice API (using the [whatsmeow](https://github.com/tulir/whatsmeow) library). All your messages are stored locally in a SQLite database and only sent to an LLM (such as Claude) when the agent accesses them through tools (which you control).
 
-## Configuration
+Here's an example of what you can do when it's connected to Claude.
 
-The server can be configured using the following environment variables:
+![WhatsApp MCP](./example-use.png)
 
-- `MCP_TRANSPORT` - Transport protocol (`stdio` or `http`, default: `stdio`)
-- `PORT` - HTTP server port when using HTTP transport (default: `8000`)
-- `WHATSAPP_API_URL` - URL of the WhatsApp API bridge (default: `http://localhost:8080/api`)
-
-## Deployment Instructions for Render
-
-1. Create a new Web Service on Render
-   - Connect your repository or use Render's direct deployment
-   - Select the "Web Service" option
-
-2. Configure the service:
-   - **Name**: whatsapp-mcp
-   - **Build Command**: `pip install -r whatsapp-mcp-server/requirements.txt`
-   - **Start Command**: `cd whatsapp-mcp-server && MCP_TRANSPORT=http python main.py`
-   - **Environment**: Python 3
-
-3. Add environment variables:
-   - `WHATSAPP_API_URL`: URL of your WhatsApp bridge service
-
-4. Deploy
-
-## Important Notes
-
-- The WhatsApp Bridge service must be accessible from the Render hosted service
-- The database files (`messages.db` and `whatsapp.db`) need to be populated with relevant data
-- For production use, consider moving to a proper database backend instead of SQLite
-
-## WhatsApp Bridge
-
-The WhatsApp Bridge component needs to be deployed separately and made accessible to this MCP server. The bridge service URL should be provided to the MCP server using the `WHATSAPP_API_URL` environment variable.
+> To get updates on this and other projects I work on [enter your email here](https://docs.google.com/forms/d/1rTF9wMBTN0vPfzWuQa2BjfGKdKIpTbyeKxhPMcEzgyI/preview)
 
 ## Installation
 
