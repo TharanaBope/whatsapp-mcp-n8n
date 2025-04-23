@@ -2,19 +2,10 @@ services:
   - type: web
     name: whatsapp-mcp
     env: docker
-    repo: https://github.com/Tharanabope/whatsapp-mcp.git # Change this to your GitHub repo
-    buildCommand: |
-      # Install Go dependencies
-      cd whatsapp-bridge
-      go mod download
-      cd ..
-
-      # Install Python dependencies
-      cd whatsapp-mcp-server
-      pip install -r requirements.txt
-      cd ..
-    startCommand: bash -c "cd whatsapp-bridge && go run main.go & cd whatsapp-mcp-server && MCP_TRANSPORT=http WHATSAPP_API_URL=http://localhost:8080/api python main.py"
+    repo: https://github.com/TharanaBope/whatsapp-mcp-n8n.git  # Update this to your actual GitHub repo
+    buildCommand: ""  # Docker builds automatically
+    startCommand: ""  # Docker starts automatically
     envVars:
       - key: PORT
         value: 8000
-    plan: free # Using free tier
+    plan: free  # Using free tier

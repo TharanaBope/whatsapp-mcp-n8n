@@ -20,11 +20,50 @@ COPY whatsapp-mcp-server ./whatsapp-mcp-server
 RUN python3 -m venv /app/venv
 RUN /app/venv/bin/pip install -r whatsapp-mcp-server/requirements.txt
 
+# Add fastapi and uvicorn to expose a health check endpoint
+RUN /app/venv/bin/pip install fastapi uvicorn
+
 # Create directory for persistent storage
 RUN mkdir -p /app/whatsapp-bridge/store
 
-# Expose port for the MCP server
+# Create a simple wrapper script to start both services
+RUN echo '#!/bin/bash\n\
+cd /app/whatsapp-bridge && go run main.go & \n\
+cd /app/whatsapp-mcp-server && python3 /app/healthcheck.py\n' > /app/start.sh && \
+chmod +x /app/start.sh
+
+# Create a health check server Python script
+RUN echo 'import os\n\
+import uvicorn\n\
+from fastapi import FastAPI\n\
+import subprocess\n\
+import threading\n\
+import time\n\
+\n\
+app = FastAPI()\n\
+\n\
+@app.get("/")\n\
+def read_root():\n\
+    return {"status": "ok", "message": "WhatsApp Bridge running"}\n\
+\n\
+def start_whatsapp_mcp():\n\
+    time.sleep(2)  # Give the health check server time to start\n\
+    env = os.environ.copy()\n\
+    env["MCP_TRANSPORT"] = "stdio"\n\
+    subprocess.run(["python3", "main.py"], env=env)\n\
+\n\
+# Start WhatsApp MCP in a separate thread\n\
+thread = threading.Thread(target=start_whatsapp_mcp)\n\
+thread.daemon = True\n\
+thread.start()\n\
+\n\
+if __name__ == "__main__":\n\
+    port = int(os.environ.get("PORT", 8000))\n\
+    print(f"Starting health check server on port {port}")\n\
+    uvicorn.run(app, host="0.0.0.0", port=port)\n' > /app/healthcheck.py
+
+# Expose the port that Render will scan for
 EXPOSE 8000
 
-# Set the startup command
-CMD cd whatsapp-bridge && go run main.go & cd whatsapp-mcp-server && MCP_TRANSPORT=http WHATSAPP_API_URL=http://localhost:8080/api /app/venv/bin/python main.py
+# Set the startup command to use our wrapper script
+CMD ["/app/start.sh"]
