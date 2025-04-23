@@ -252,9 +252,8 @@ if __name__ == "__main__":
     # Get transport type from environment variables
     requested_transport = os.environ.get("MCP_TRANSPORT", "stdio")
     
-    # Debug: print MCP version and available transports
-    import mcp
-    print(f"MCP version: {mcp.__version__}")
+    # Debug: print package info
+    print(f"Using MCP package for WhatsApp bridge")
     
     # Check if 'http' transport is supported
     # In older versions, only 'stdio' might be available
@@ -267,8 +266,8 @@ if __name__ == "__main__":
             available_transports.append('http')
         available_transports.append('stdio')  # stdio should always be available
         print(f"Available transports determined by code inspection: {available_transports}")
-    except:
-        print("Could not inspect code to determine available transports")
+    except Exception as e:
+        print(f"Could not inspect code to determine available transports: {e}")
         available_transports = ['stdio']  # Fallback to just stdio
     
     # Set environment variables for HTTP transport
