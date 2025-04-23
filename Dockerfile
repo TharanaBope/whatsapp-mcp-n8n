@@ -18,10 +18,11 @@ COPY whatsapp-mcp-server ./whatsapp-mcp-server
 
 # Create Python virtual environment and install dependencies
 RUN python3 -m venv /app/venv
+RUN /app/venv/bin/pip install --upgrade pip
 RUN /app/venv/bin/pip install -r whatsapp-mcp-server/requirements.txt
 
-# Add fastapi and uvicorn to expose a health check endpoint
-RUN /app/venv/bin/pip install fastapi uvicorn
+# Install fastapi and uvicorn directly with pip (not using venv)
+RUN pip install fastapi uvicorn
 
 # Create directory for persistent storage
 RUN mkdir -p /app/whatsapp-bridge/store
