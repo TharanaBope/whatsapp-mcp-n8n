@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 import os
+import sys
 from whatsapp import (
     search_contacts as whatsapp_search_contacts,
     list_messages as whatsapp_list_messages,
@@ -249,13 +250,38 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     # Get transport type from environment variables
-    transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    requested_transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    
+    # Debug: print MCP version and available transports
+    import mcp
+    print(f"MCP version: {mcp.__version__}")
+    
+    # Check if 'http' transport is supported
+    # In older versions, only 'stdio' might be available
+    available_transports = []
+    try:
+        # Try to inspect the FastMCP source code
+        import inspect
+        source = inspect.getsource(mcp.server.fastmcp.server.FastMCP.run)
+        if "transport == 'http'" in source or "transport == 'https'" in source:
+            available_transports.append('http')
+        available_transports.append('stdio')  # stdio should always be available
+        print(f"Available transports determined by code inspection: {available_transports}")
+    except:
+        print("Could not inspect code to determine available transports")
+        available_transports = ['stdio']  # Fallback to just stdio
     
     # Set environment variables for HTTP transport
-    if transport == "http":
+    if requested_transport == "http" and 'http' in available_transports:
         port = os.environ.get("PORT", "8000")
         os.environ["MCP_PORT"] = port
         os.environ["MCP_HOST"] = "0.0.0.0"
+        transport = 'http'
+    else:
+        # Fallback to stdio transport
+        transport = 'stdio'
+        print(f"Warning: Requested transport '{requested_transport}' not available. Using 'stdio' instead.")
     
+    print(f"Using transport: {transport}")
     # Run with only the transport parameter which should be supported by all versions
     mcp.run(transport=transport)
