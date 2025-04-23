@@ -1,0 +1,34 @@
+# Git files
+.git
+.gitignore
+
+# Log files
+*.log
+
+# Build directories
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/.Python
+**/env/
+**/build/
+**/develop-eggs/
+**/dist/
+**/downloads/
+**/eggs/
+**/.eggs/
+**/lib/
+**/lib64/
+**/parts/
+**/sdist/
+**/var/
+**/*.egg-info/
+**/.installed.cfg
+**/*.egg
+
+# Database files (we'll create these in the container)
+whatsapp-bridge/store/*.db
+
+# Markdown documentation
+*.md
+!README.md

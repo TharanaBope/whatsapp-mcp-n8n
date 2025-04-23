@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: whatsapp-mcp
+    env: docker
+    repo: https://github.com/yourusername/whatsapp-mcp.git  # Change this to your GitHub repo
+    buildCommand: |
+      # Install Go dependencies
+      cd whatsapp-bridge
+      go mod download
+      cd ..
+      
+      # Install Python dependencies
+      cd whatsapp-mcp-server
+      pip install -r requirements.txt
+      cd ..
+    startCommand: bash -c "cd whatsapp-bridge && go run main.go & cd whatsapp-mcp-server && MCP_TRANSPORT=http WHATSAPP_API_URL=http://localhost:8080/api python main.py"
+    envVars:
+      - key: PORT
+        value: 8000
+    plan: standard # You'll need the standard plan for persistent connections
