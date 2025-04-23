@@ -20,9 +20,7 @@ COPY whatsapp-mcp-server ./whatsapp-mcp-server
 RUN python3 -m venv /app/venv
 RUN /app/venv/bin/pip install --upgrade pip
 RUN /app/venv/bin/pip install -r whatsapp-mcp-server/requirements.txt
-
-# Install fastapi and uvicorn directly with pip (not using venv)
-RUN pip install fastapi uvicorn
+RUN /app/venv/bin/pip install fastapi uvicorn
 
 # Create directory for persistent storage
 RUN mkdir -p /app/whatsapp-bridge/store
@@ -30,7 +28,7 @@ RUN mkdir -p /app/whatsapp-bridge/store
 # Create a simple wrapper script to start both services
 RUN echo '#!/bin/bash\n\
 cd /app/whatsapp-bridge && go run main.go & \n\
-cd /app/whatsapp-mcp-server && python3 /app/healthcheck.py\n' > /app/start.sh && \
+cd /app/whatsapp-mcp-server && /app/venv/bin/python /app/healthcheck.py\n' > /app/start.sh && \
 chmod +x /app/start.sh
 
 # Create a health check server Python script
@@ -51,7 +49,7 @@ def start_whatsapp_mcp():\n\
     time.sleep(2)  # Give the health check server time to start\n\
     env = os.environ.copy()\n\
     env["MCP_TRANSPORT"] = "stdio"\n\
-    subprocess.run(["python3", "main.py"], env=env)\n\
+    subprocess.run(["/app/venv/bin/python", "main.py"], env=env)\n\
 \n\
 # Start WhatsApp MCP in a separate thread\n\
 thread = threading.Thread(target=start_whatsapp_mcp)\n\
