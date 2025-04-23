@@ -1,4 +1,4 @@
-FROM golang:1.19 as builder
+FROM golang:1.24.1 as builder
 
 # Install Python
 RUN apt-get update && apt-get install -y python3 python3-pip python3-venv
