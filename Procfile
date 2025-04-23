@@ -1,0 +1,1 @@
+web: cd whatsapp-mcp-server && MCP_TRANSPORT=http python main.py
