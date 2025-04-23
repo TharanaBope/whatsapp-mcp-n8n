@@ -251,19 +251,11 @@ if __name__ == "__main__":
     # Get transport type from environment variables
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     
-    # Initialize and run the server with the specified transport
+    # Set environment variables for HTTP transport
     if transport == "http":
-        # Check MCP library version and use appropriate parameters
-        import inspect
-        run_params = inspect.signature(mcp.run).parameters
-        
-        if 'port' in run_params:
-            # If port is a valid parameter
-            port = int(os.environ.get("PORT", 8000))
-            mcp.run(transport='http', port=port, host="0.0.0.0")
-        else:
-            # Use environment variables instead
-            os.environ["MCP_PORT"] = os.environ.get("PORT", "8000")
-            mcp.run(transport='http', host="0.0.0.0")
-    else:
-        mcp.run(transport='stdio')
+        port = os.environ.get("PORT", "8000")
+        os.environ["MCP_PORT"] = port
+        os.environ["MCP_HOST"] = "0.0.0.0"
+    
+    # Run with only the transport parameter which should be supported by all versions
+    mcp.run(transport=transport)
