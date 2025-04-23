@@ -17,4 +17,4 @@ services:
     envVars:
       - key: PORT
         value: 8000
-    plan: standard # You'll need the standard plan for persistent connections
+    plan: free # Using free tier
