@@ -119,7 +119,6 @@ func (store *MessageStore) StoreMessage(id, chatJID, sender, content string, tim
 		`INSERT OR REPLACE INTO messages 
 		(id, chat_jid, sender, content, timestamp, is_from_me, media_type, filename, url, media_key, file_sha256, file_enc_sha256, file_length) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-
 		id, chatJID, sender, content, timestamp, isFromMe, mediaType, filename, url, mediaKey, fileSHA256, fileEncSHA256, fileLength,
 	)
 	return err
@@ -787,20 +786,6 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	}()
 }
 
-// Generate WhatsApp QR code with clear log markers
-func generateQRWithMarkers(code string) {
-	fmt.Println("\n==================================================")
-	fmt.Println("               WHATSAPP QR CODE                   ")
-	fmt.Println("==================================================")
-	fmt.Println("SCAN THIS QR CODE WITH YOUR WHATSAPP MOBILE APP:")
-	fmt.Println()
-	qrterminal.GenerateHalfBlock(code, qrterminal.L, os.Stdout)
-	fmt.Println()
-	fmt.Println("==================================================")
-	fmt.Println("     QR CODE WILL EXPIRE IN ABOUT 60 SECONDS      ")
-	fmt.Println("==================================================\n")
-}
-
 func main() {
 	// Set up logger
 	logger := waLog.Stdout("Client", "INFO", true)
@@ -884,8 +869,8 @@ func main() {
 		// Print QR code for pairing with phone
 		for evt := range qrChan {
 			if evt.Event == "code" {
-				// Use our custom function with clear markers
-				generateQRWithMarkers(evt.Code)
+				fmt.Println("\nScan this QR code with your WhatsApp app:")
+				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
 			} else if evt.Event == "success" {
 				connected <- true
 				break
