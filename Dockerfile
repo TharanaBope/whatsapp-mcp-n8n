@@ -20,47 +20,30 @@ COPY whatsapp-mcp-server ./whatsapp-mcp-server
 RUN python3 -m venv /app/venv
 RUN /app/venv/bin/pip install --upgrade pip
 RUN /app/venv/bin/pip install -r whatsapp-mcp-server/requirements.txt
-RUN /app/venv/bin/pip install fastapi uvicorn
+RUN /app/venv/bin/pip install fastapi uvicorn python-dotenv
 
 # Create directory for persistent storage
 RUN mkdir -p /app/whatsapp-bridge/store
 
-# Add script to manually test and check WhatsApp connection
-RUN echo 'import os\n\
-import time\n\
-import subprocess\n\
-import threading\n\
-\n\
-def run_whatsapp_bridge():\n\
-    print("Starting WhatsApp bridge...")\n\
-    os.system("cd /app/whatsapp-bridge && go run main.go 2>&1 | tee /app/qr_log.txt")\n\
-\n\
-def run_health_server():\n\
-    print("Starting health server...")\n\
-    os.system("cd /app/whatsapp-mcp-server && /app/venv/bin/python /app/healthcheck.py")\n\
-\n\
-# Start the WhatsApp bridge in a separate thread\n\
-bridge_thread = threading.Thread(target=run_whatsapp_bridge)\n\
-bridge_thread.daemon = True\n\
-bridge_thread.start()\n\
-\n\
-# Give the bridge a moment to initialize before starting the health server\n\
-time.sleep(5)\n\
-\n\
-# Run the health server in the main thread\n\
-run_health_server()\n\
-' > /app/runner.py
-
-# Create a health check server Python script
+# Create a direct proxy for MCP API
 RUN echo 'import os\n\
 import uvicorn\n\
-from fastapi import FastAPI, HTTPException\n\
+from fastapi import FastAPI, Request, Response\n\
 import subprocess\n\
 import threading\n\
 import time\n\
+import httpx\n\
 import json\n\
+import logging\n\
+\n\
+# Configure logging\n\
+logging.basicConfig(level=logging.INFO)\n\
+logger = logging.getLogger("mcp-proxy")\n\
 \n\
 app = FastAPI()\n\
+\n\
+# Store the WhatsApp session status\n\
+mcp_status = {"started": False, "authenticated": False}\n\
 \n\
 @app.get("/")\n\
 def read_root():\n\
@@ -75,6 +58,7 @@ def get_qr_status():\n\
             with open("/app/qr_log.txt", "r") as f:\n\
                 log_content = f.read()\n\
                 if "Successfully connected and authenticated" in log_content:\n\
+                    mcp_status["authenticated"] = True\n\
                     return {"status": "authenticated", "message": "WhatsApp is authenticated"}\n\
                 elif "Scan this QR code" in log_content:\n\
                     # Extract the QR code ASCII art if possible\n\
@@ -115,24 +99,89 @@ def get_logs():\n\
     except FileNotFoundError:\n\
         return {"logs": "No logs found yet"}\n\
 \n\
-def start_whatsapp_mcp():\n\
-    time.sleep(2)  # Give the health check server time to start\n\
-    env = os.environ.copy()\n\
-    env["MCP_TRANSPORT"] = "stdio"\n\
-    subprocess.run(["/app/venv/bin/python", "main.py"], env=env)\n\
+# Direct proxies for the MCP API\n\
+@app.post("/tool/{tool_name}")\n\
+async def proxy_tool(tool_name: str, request: Request):\n\
+    logger.info(f"MCP API request received for tool: {tool_name}")\n\
+    try:\n\
+        # Get the request body\n\
+        body = await request.json()\n\
+        logger.info(f"Request body: {body}")\n\
+        \n\
+        # Handle send_message directly\n\
+        if tool_name == "send_message":\n\
+            recipient = body.get("recipient", "")\n\
+            message = body.get("message", "")\n\
+            logger.info(f"Sending message to {recipient}: {message}")\n\
+            \n\
+            if not recipient or not message:\n\
+                return {"success": False, "message": "Recipient and message are required"}\n\
+            \n\
+            try:\n\
+                # Make sure the environment variables are set\n\
+                os.environ["WHATSAPP_API_URL"] = "http://localhost:8080/api"\n\
+                \n\
+                # Import the function directly\n\
+                from whatsapp import send_message as whatsapp_send_message\n\
+                \n\
+                # Call the function\n\
+                success, status_message = whatsapp_send_message(recipient, message)\n\
+                response = {"success": success, "message": status_message}\n\
+                logger.info(f"Send message response: {response}")\n\
+                return response\n\
+            except Exception as e:\n\
+                error_msg = f"Error sending message: {str(e)}"\n\
+                logger.error(error_msg)\n\
+                return {"success": False, "message": error_msg}\n\
+        \n\
+        # Handle other tools through HTTP API if needed\n\
+        # ...\n\
+        \n\
+        # Default fallback response\n\
+        return {"success": False, "message": f"Tool {tool_name} implementation not found"}\n\
+    except Exception as e:\n\
+        error_msg = f"Error processing request: {str(e)}"\n\
+        logger.error(error_msg)\n\
+        return {"success": False, "message": error_msg}\n\
 \n\
-# Start WhatsApp MCP in a separate thread\n\
-thread = threading.Thread(target=start_whatsapp_mcp)\n\
-thread.daemon = True\n\
-thread.start()\n\
+def run_whatsapp_bridge():\n\
+    logger.info("Starting WhatsApp bridge...")\n\
+    try:\n\
+        os.system("cd /app/whatsapp-bridge && go run main.go 2>&1 | tee /app/qr_log.txt")\n\
+    except Exception as e:\n\
+        logger.error(f"Error running WhatsApp bridge: {str(e)}")\n\
+\n\
+def run_mcp_server():\n\
+    logger.info("Starting MCP server...")\n\
+    try:\n\
+        env = os.environ.copy()\n\
+        env["MCP_TRANSPORT"] = "stdio"\n\
+        env["WHATSAPP_API_URL"] = "http://localhost:8080/api"\n\
+        os.chdir("/app/whatsapp-mcp-server")\n\
+        subprocess.run(["/app/venv/bin/python", "main.py"], env=env)\n\
+    except Exception as e:\n\
+        logger.error(f"Error running MCP server: {str(e)}")\n\
+\n\
+# Start WhatsApp bridge in a separate thread\n\
+bridge_thread = threading.Thread(target=run_whatsapp_bridge)\n\
+bridge_thread.daemon = True\n\
+bridge_thread.start()\n\
+\n\
+# Start MCP server in a separate thread\n\
+mcp_thread = threading.Thread(target=run_mcp_server)\n\
+mcp_thread.daemon = True\n\
+mcp_thread.start()\n\
 \n\
 if __name__ == "__main__":\n\
+    # Mark services as started\n\
+    mcp_status["started"] = True\n\
+    \n\
     port = int(os.environ.get("PORT", 8000))\n\
-    print(f"Starting health check server on port {port}")\n\
-    uvicorn.run(app, host="0.0.0.0", port=port)\n' > /app/healthcheck.py
+    logger.info(f"Starting API proxy server on port {port}")\n\
+    uvicorn.run(app, host="0.0.0.0", port=port)\n' > /app/direct_proxy.py
 
 # Expose the port that Render will scan for
 EXPOSE 8000
 
-# Set the startup command to use the Python runner script
-CMD ["/app/venv/bin/python", "/app/runner.py"]
+# Set the startup command to use the proxy server
+CMD ["/app/venv/bin/python", "/app/direct_proxy.py"]
