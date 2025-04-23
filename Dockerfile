@@ -16,8 +16,9 @@ RUN cd whatsapp-bridge && go mod download
 COPY whatsapp-bridge ./whatsapp-bridge
 COPY whatsapp-mcp-server ./whatsapp-mcp-server
 
-# Install Python dependencies
-RUN cd whatsapp-mcp-server && pip3 install -r requirements.txt
+# Create Python virtual environment and install dependencies
+RUN python3 -m venv /app/venv
+RUN /app/venv/bin/pip install -r whatsapp-mcp-server/requirements.txt
 
 # Create directory for persistent storage
 RUN mkdir -p /app/whatsapp-bridge/store
@@ -26,4 +27,4 @@ RUN mkdir -p /app/whatsapp-bridge/store
 EXPOSE 8000
 
 # Set the startup command
-CMD cd whatsapp-bridge && go run main.go & cd whatsapp-mcp-server && MCP_TRANSPORT=http WHATSAPP_API_URL=http://localhost:8080/api python3 main.py
+CMD cd whatsapp-bridge && go run main.go & cd whatsapp-mcp-server && MCP_TRANSPORT=http WHATSAPP_API_URL=http://localhost:8080/api /app/venv/bin/python main.py
