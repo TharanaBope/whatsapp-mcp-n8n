@@ -27,6 +27,7 @@ RUN mkdir -p /app/whatsapp-bridge/store
 
 # Create a direct proxy for MCP API
 RUN echo 'import os\n\
+import sys\n\
 import uvicorn\n\
 from fastapi import FastAPI, Request, Response\n\
 import subprocess\n\
@@ -35,6 +36,9 @@ import time\n\
 import httpx\n\
 import json\n\
 import logging\n\
+\n\
+# Add whatsapp-mcp-server to Python path\n\
+sys.path.append("/app/whatsapp-mcp-server")\n\
 \n\
 # Configure logging\n\
 logging.basicConfig(level=logging.INFO)\n\
@@ -99,6 +103,9 @@ def get_logs():\n\
     except FileNotFoundError:\n\
         return {"logs": "No logs found yet"}\n\
 \n\
+# Create a direct HTTP client for the WhatsApp bridge API\n\
+whatsapp_client = httpx.AsyncClient(base_url="http://localhost:8080/api")\n\
+\n\
 # Direct proxies for the MCP API\n\
 @app.post("/tool/{tool_name}")\n\
 async def proxy_tool(tool_name: str, request: Request):\n\
@@ -118,24 +125,38 @@ async def proxy_tool(tool_name: str, request: Request):\n\
                 return {"success": False, "message": "Recipient and message are required"}\n\
             \n\
             try:\n\
-                # Make sure the environment variables are set\n\
-                os.environ["WHATSAPP_API_URL"] = "http://localhost:8080/api"\n\
+                # Make a direct HTTP request to the WhatsApp bridge API\n\
+                response = await whatsapp_client.post(\n\
+                    "/message/text",\n\
+                    json={\n\
+                        "jid": f"{recipient}@s.whatsapp.net" if not "@" in recipient else recipient,\n\
+                        "message": message\n\
+                    }\n\
+                )\n\
                 \n\
-                # Import the function directly\n\
-                from whatsapp import send_message as whatsapp_send_message\n\
+                result = response.json()\n\
+                logger.info(f"WhatsApp API response: {result}")\n\
                 \n\
-                # Call the function\n\
-                success, status_message = whatsapp_send_message(recipient, message)\n\
-                response = {"success": success, "message": status_message}\n\
-                logger.info(f"Send message response: {response}")\n\
-                return response\n\
+                # Format the response to match the expected MCP format\n\
+                success = response.status_code == 200\n\
+                status_message = "Message sent successfully" if success else f"Error: {result.get(\'error\', \'Unknown error\')}" \n\
+                \n\
+                response_data = {"success": success, "message": status_message}\n\
+                logger.info(f"Send message response: {response_data}")\n\
+                return response_data\n\
             except Exception as e:\n\
                 error_msg = f"Error sending message: {str(e)}"\n\
                 logger.error(error_msg)\n\
                 return {"success": False, "message": error_msg}\n\
         \n\
-        # Handle other tools through HTTP API if needed\n\
-        # ...\n\
+        # Handle other tools here as needed\n\
+        elif tool_name == "search_contacts":\n\
+            query = body.get("query", "")\n\
+            try:\n\
+                response = await whatsapp_client.get(f"/contacts/search?query={query}")\n\
+                return response.json()\n\
+            except Exception as e:\n\
+                return {"success": False, "message": f"Error searching contacts: {str(e)}"}\n\
         \n\
         # Default fallback response\n\
         return {"success": False, "message": f"Tool {tool_name} implementation not found"}\n\
@@ -151,26 +172,13 @@ def run_whatsapp_bridge():\n\
     except Exception as e:\n\
         logger.error(f"Error running WhatsApp bridge: {str(e)}")\n\
 \n\
-def run_mcp_server():\n\
-    logger.info("Starting MCP server...")\n\
-    try:\n\
-        env = os.environ.copy()\n\
-        env["MCP_TRANSPORT"] = "stdio"\n\
-        env["WHATSAPP_API_URL"] = "http://localhost:8080/api"\n\
-        os.chdir("/app/whatsapp-mcp-server")\n\
-        subprocess.run(["/app/venv/bin/python", "main.py"], env=env)\n\
-    except Exception as e:\n\
-        logger.error(f"Error running MCP server: {str(e)}")\n\
-\n\
 # Start WhatsApp bridge in a separate thread\n\
 bridge_thread = threading.Thread(target=run_whatsapp_bridge)\n\
 bridge_thread.daemon = True\n\
 bridge_thread.start()\n\
 \n\
-# Start MCP server in a separate thread\n\
-mcp_thread = threading.Thread(target=run_mcp_server)\n\
-mcp_thread.daemon = True\n\
-mcp_thread.start()\n\
+# Wait for the WhatsApp bridge to start\n\
+time.sleep(5)\n\
 \n\
 if __name__ == "__main__":\n\
     # Mark services as started\n\
