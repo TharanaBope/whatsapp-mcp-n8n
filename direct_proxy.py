@@ -226,9 +226,9 @@ async def proxy_tool(tool_name: str, request: Request):
             try:
                 # Make a direct HTTP request to the WhatsApp bridge API
                 response = await whatsapp_client.post(
-                    "/message/text",
+                    "/send",  # Changed from "/message/text" to "/send" to match WhatsApp bridge API
                     json={
-                        "jid": f"{recipient}@s.whatsapp.net" if not "@" in recipient else recipient,
+                        "recipient": recipient,  # Use the recipient directly as the WhatsApp bridge expects
                         "message": message
                     }
                 )
@@ -237,8 +237,8 @@ async def proxy_tool(tool_name: str, request: Request):
                 logger.info(f"WhatsApp API response: {result}")
                 
                 # Format the response to match the expected MCP format
-                success = response.status_code == 200
-                status_message = "Message sent successfully" if success else f"Error: {result.get('error', 'Unknown error')}" 
+                success = response.status_code == 200 and result.get("success", False)
+                status_message = result.get("message", "Unknown response")
                 
                 response_data = {"success": success, "message": status_message}
                 logger.info(f"Send message response: {response_data}")
@@ -263,6 +263,19 @@ async def proxy_tool(tool_name: str, request: Request):
         error_msg = f"Error processing request: {str(e)}"
         logger.error(error_msg)
         return {"success": False, "message": error_msg}
+
+# Additional endpoints for n8n compatibility
+@app.post("/api/tool/{tool_name}")
+async def api_tool_proxy(tool_name: str, request: Request):
+    """Alternate endpoint path for n8n compatibility"""
+    # Simply forward to the main tool proxy handler
+    return await proxy_tool(tool_name, request)
+
+@app.post("/mcp/tool/{tool_name}")
+async def mcp_tool_proxy(tool_name: str, request: Request):
+    """Alternate endpoint path for MCP standard compatibility"""
+    # Simply forward to the main tool proxy handler
+    return await proxy_tool(tool_name, request)
 
 def run_whatsapp_bridge():
     logger.info("Starting WhatsApp bridge...")
